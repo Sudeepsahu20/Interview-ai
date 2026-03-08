@@ -6,101 +6,147 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 
 const ai = new GoogleGenAI({});
 
-const interviewReportSchema = z.object({
-  matchScore: z.number(),
+const interviewFunctions = [
+{
+  name: "analyzeInterview",
+  description: "Analyze resume against job description",
+  parameters: {
+    type: "object",
 
-  technicalQuestions: z.array(
-    z.object({
-      question: z.string(),
-      intent: z.string(),
-      answer: z.string()
-    })
-  ),
+    properties: {
 
-  behavioralQuestions: z.array(
-    z.object({
-      question: z.string(),
-      intent: z.string(),
-      answer: z.string()
-    })
-  ),
+      title: {
+        type: "string",
+        description: "Short title for the interview report"
+      },
 
-  skillGaps: z.array(
-    z.object({
-      skill: z.string(),
-      severity: z.enum(["low", "medium", "high"])
-    })
-  ),
+      matchScore: {
+        type: "number"
+      },
 
-  preparationPlan: z.array(
-    z.object({
-      day: z.number(),
-      focus: z.string(),
-      tasks: z.array(z.string())
-    })
-  )
-});
+      technicalQuestions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            intention: { type: "string" },
+            answer: { type: "string" }
+          },
+          required: ["question","intention","answer"]
+        }
+      },
+
+      behavioralQuestions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            intention: { type: "string" },
+            answer: { type: "string" }
+          },
+          required: ["question","intention","answer"]
+        }
+      },
+
+      skillGaps: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            skill: { type: "string" },
+            severity: { type: "string" }
+          },
+          required:["skill","severity"]
+        }
+      },
+
+      preparationPlan: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            day: { type: "number" },
+            focus: { type: "string" },
+            tasks: {
+              type: "array",
+              items: { type: "string" }
+            }
+          },
+          required:["day","focus","tasks"]
+        }
+      }
+
+    },
+
+    required: [
+      "title",
+      "matchScore",
+      "technicalQuestions",
+      "behavioralQuestions",
+      "skillGaps",
+      "preparationPlan"
+    ]
+  }
+}
+]
 
 async function generateInterviewReport({ resume, selfDescription, jobDescription }) {
+
 const prompt = `
 You are an AI interview assistant.
 
-Analyze the candidate and generate interview preparation data.
+Generate interview preparation data for the candidate.
 
-Return ONLY valid JSON.
+IMPORTANT RULES:
 
-IMPORTANT:
-- Arrays must contain OBJECTS not strings
-- Do not return field names only
-- Generate real content
-- Follow the exact structure
+1. Return ONLY valid JSON.
+2. Arrays MUST contain objects.
+3. Do NOT return field names as strings.
+4. Each object must contain real content.
 
-Example Output:
+Correct format example:
 
 {
  "matchScore": 85,
-
- "technicalQuestions":[
-   {
-    "question":"Explain Node.js event loop",
-    "intent":"Check understanding of async model",
-    "answer":"Node.js uses an event loop to handle asynchronous operations..."
-   },
-   {
-    "question":"How do you secure REST APIs using JWT?",
-    "intent":"Evaluate backend authentication knowledge",
-    "answer":"JWT authentication works by generating a signed token..."
-   }
+  "title": "Node.js Backend Developer Interview Prep Report",
+ "technicalQuestions": [
+  {
+   "question": "Explain Node.js event loop",
+   "intention": "Check understanding of async programming",
+   "answer": "Node.js uses an event loop to handle asynchronous operations"
+  }
  ],
 
- "behavioralQuestions":[
-   {
-    "question":"Tell me about a challenging backend bug you solved",
-    "intent":"Evaluate problem solving",
-    "answer":"In one project I encountered..."
-   }
+ "behavioralQuestions": [
+  {
+   "question": "Tell me about a challenging project",
+   "intention": "Evaluate problem solving",
+   "answer": "In one project I faced..."
+  }
  ],
 
- "skillGaps":[
-   {
-    "skill":"System Design",
-    "severity":"medium"
-   }
+ "skillGaps": [
+  {
+   "skill": "System Design",
+   "severity": "medium"
+  }
  ],
 
- "preparationPlan":[
-   {
-    "day":1,
-    "focus":"Node.js fundamentals",
-    "tasks":[
-      "Study event loop",
-      "Practice building REST APIs"
-    ]
-   }
+ "preparationPlan": [
+  {
+   "day": 1,
+   "focus": "Node.js fundamentals",
+   "tasks": [
+    "Study event loop",
+    "Build REST APIs"
+   ]
+  }
  ]
 }
 
-Now generate a similar JSON response.
+Now generate REAL content using this structure.
 
 Resume:
 ${resume}
@@ -113,23 +159,52 @@ ${jobDescription}
 
 Return ONLY JSON.
 `;
-
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      temperature: 0.2,
-      responseMimeType: "application/json",
-      responseSchema: zodToJsonSchema(interviewReportSchema)
+  model: "gemini-2.5-flash-lite",
+  contents: prompt,
+  config:{
+    tools:[
+      {
+        functionDeclarations: interviewFunctions
+      }
+    ],
+     toolConfig:{
+      functionCallingConfig:{
+        mode:"ANY"
+      }
     }
-  });
+  }
+})
 
-  // Step 1: Clean code fences if any
-  const clean = response.text.replace(/```json/g, "").replace(/```/g, "");
 
-  // Step 2: Parse JSON
-  const data = JSON.parse(clean);
-console.log(data);
+const candidate = response?.candidates?.[0]
+
+if(!candidate){
+  throw new Error("No response from AI")
+}
+
+const parts = candidate?.content?.parts || []
+
+for(const part of parts){
+
+  if(part.functionCall){
+
+    const args = part.functionCall.args
+
+    return {
+      title: args.title,
+      matchScore: args.matchScore,
+      technicalQuestions: args.technicalQuestions,
+      behavioralQuestions: args.behavioralQuestions,
+      skillGaps: args.skillGaps,
+      preparationPlan: args.preparationPlan
+    }
+
+  }
+
+}
+
+throw new Error("AI did not return function call")
 }
 
 export default generateInterviewReport;
