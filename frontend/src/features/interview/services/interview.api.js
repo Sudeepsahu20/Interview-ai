@@ -1,5 +1,5 @@
 import axios from "axios";
-import Interview from "../pages/Interview";
+
 
 const api = axios.create({
     baseURL: "https://interview-ai-4cjo.onrender.com",
