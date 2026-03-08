@@ -1,3 +1,4 @@
+
 import interviewReportModel from "../models/interviewReport.model.js";
 import generateInterviewReport from "../services/ai.service.js";
 
@@ -14,7 +15,6 @@ async function generateInterviewReportController(req,res) {
 
 
         const resumeContent = await pdf(req.file.buffer);
-        console.log(resumeContent.text); 
         const {selfDescription,jobDescription}=req.body;
       
 
@@ -23,9 +23,9 @@ async function generateInterviewReportController(req,res) {
             jobDescription,
             selfDescription
         })
-        console.log("AI RESPONSE:--------", interviewReportByai)
+
         const interviewReport=await interviewReportModel.create({
-            id:req.user.id,
+            user:req.user.id,
             resume:resumeContent.text,
             jobDescription,
             selfDescription,
@@ -51,13 +51,11 @@ async function generateInterviewReportController(req,res) {
 async function getInterviewReportByIdController(req,res) {
     try {
         const {interviewId}=req.params;
-
-        const interviewReport=await interviewReportModel.findOne({_id:interviewId,user:req.user.id});
-
+        const interviewReport=await interviewReportModel.findOne({_id:interviewId,user: req.user.id});
           if (!interviewReport) {
             return res.status(404).json({ message: "Report not found" }); // 404 is better than 400
         }
-
+      
        return res.status(200).json({
         message:"Interview Report fetched succcessfuly",
         interviewReport

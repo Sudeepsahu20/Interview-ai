@@ -11,7 +11,6 @@ const Home = () => {
     const resumeInputRef = useRef()
 
     const navigate = useNavigate()
-
     const handleGenerateReport = async () => {
         const resumeFile = resumeInputRef.current.files[ 0 ]
         const data = await generateReport({ jobDescription, selfDescription, resumeFile })
