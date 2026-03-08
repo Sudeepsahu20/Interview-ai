@@ -2,7 +2,7 @@ import axios from "axios";
 import Interview from "../pages/Interview";
 
 const api = axios.create({
-    baseURL: "http://localhost:3000",
+    baseURL: "https://interview-ai-4cjo.onrender.com",
     withCredentials: true,
 })
 
